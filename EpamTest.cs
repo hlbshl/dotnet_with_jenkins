@@ -1,127 +1,136 @@
 ﻿using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
-using OpenQA.Selenium.Interactions;
 using OpenQA.Selenium.Support.UI;
+using PracticalTaskSelenium.Pages;
 
-namespace PracticalTaskSelenium;
+namespace PracticalTaskSelenium.Tests;
 
-[TestFixture]
+[TestFixture(false)]
 public class EpamTest
 {
-    private const string EpamHomePage = "https://www.epam.com";
-    private const string DefaultLocation = "All Locations";
+    private IWebDriver driver;
+    private WebDriverWait wait;
+    private BasePage basePage;
+    private SearchPage searchPage;
+    private PositionPage positionPage;
+    private InsightsPage insightsPage;
+    private ArticlePage articlePage;
+    private bool headless;
+    private string downloadDirectory;
 
-    private static IWebDriver driver;
-    private static WebDriverWait wait;
-
-    private readonly By careersLinkLocator = By.LinkText("Careers");
-    private readonly By keywordFieldLocator = By.Id("new_form_job_search-keyword");
-    private readonly By locationFieldLocator = By.XPath("//span[@title='All Locations']");
-    private readonly By remoteCheckBoxLocator = By.XPath("//p/input[@name='remote']/following-sibling::label");
-    private readonly By findCarrerButtonLocator = By.XPath("//button[contains(text(),'Find')]");
-    private readonly By allLocationsSelectionLocator = By.CssSelector("div.os-padding li[title='All Locations']");
-    private readonly By lastViewAndApplyButtonLocator = By.XPath("//li[@class='search-result__item'][last()]//a[.='View and apply']");
-    private readonly By positionArticleLocator = By.TagName("article");
-    private readonly By searchIconLocator = By.ClassName("dark-iconheader-search__search-icon");
-    private readonly By searchPanelLocator = By.ClassName("header-search__panel");
-    private readonly By searchInputLocator = By.Name("q");
-    private readonly By searchFindButtonLocator = By.XPath("//button/descendant::span[contains(text(),'Find')]");
-    private readonly By articlesLocator = By.TagName("article");
+    public EpamTest(bool headless)
+    {
+        this.headless = headless;
+    }
 
     [OneTimeSetUp]
-    public static void SetUpDriver()
-    {      
-        driver = new ChromeDriver();
+    public void SetUpDriver()
+    {
+        downloadDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Downloads");
+
+        if (!Directory.Exists(downloadDirectory))
+        {
+            Directory.CreateDirectory(downloadDirectory);
+        }
+
+        var options = new ChromeOptions();
+
+        if (headless)
+        {
+            options.AddArgument("--headless");
+            options.AddArgument("--window-size=1920,1080");
+        }
+
+        options.AddUserProfilePreference("download.default_directory", downloadDirectory);
+        options.AddUserProfilePreference("download.prompt_for_download", false);
+        options.AddUserProfilePreference("download.directory_upgrade", true);
+        options.AddUserProfilePreference("safebrowsing.enabled", true);
+
+        driver = new ChromeDriver(options);
         driver.Manage().Window.Maximize();
-        driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(5);
 
         wait = new WebDriverWait(driver, TimeSpan.FromSeconds(5))
         {
             PollingInterval = TimeSpan.FromSeconds(0.25),
             Message = "Element was not found"
         };
+
+        basePage = new BasePage(driver, wait);
+        insightsPage = new InsightsPage(driver, wait);
+        searchPage = new SearchPage(driver, wait);
+        positionPage = new PositionPage(driver, wait);
     }
 
     [TestCase("C#", "United States")]
     [TestCase("Python", "Spain")]
     [TestCase("Java", "All Locations")]
-    public void ValidatePositionSearchByCriteria(string keyWord, string country)
+    public void ValidatePositionSearchByCriteria(string keyword, string country)
     {
-        driver.Navigate().GoToUrl(EpamHomePage);
-        driver.FindElement(careersLinkLocator).Click();
 
-        var keywordField = wait.Until(driver => driver.FindElement(keywordFieldLocator));
-        var locationField = driver.FindElement(locationFieldLocator);
+        basePage
+            .Open()
+            .AcceptCookies()
+            .NavigateToPage<CareersPage>("Careers")
+            .SearchPositionByKeywordAndLocation(keyword, country)
+            .OpenLastPositionInResults();
 
-        ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", keywordField);
-
-        ClickAndSendKeysActions(keywordField, 2, keyWord);
-
-        if (country != DefaultLocation)
-        {
-            ClickAndSendKeysActions(locationField, 2, country);
-            string locationWithTestParameter = String.Format("div.os-padding li[title='All Cities in {0}']", country);
-            driver.FindElement(By.CssSelector(locationWithTestParameter)).Click();
-        }
-        else
-        {
-            locationField.Click();
-            driver.FindElement(allLocationsSelectionLocator).Click();
-        }
-
-        driver.FindElement(remoteCheckBoxLocator).Click();
-        driver.FindElement(findCarrerButtonLocator).Click();
-
-        wait.Until(driver => driver.FindElement(lastViewAndApplyButtonLocator)).Click();
-
-        wait.Until(driver => driver.FindElements(positionArticleLocator));
-
-        string queryResultWithParameter = String.Format("//*[contains(text(), '{0}')]", keyWord);
-
-        var articlesWithKeyword = driver.FindElements(By.XPath(queryResultWithParameter));
-
-        Assert.That(articlesWithKeyword.Count > 0,
+        Assert.That(positionPage.FindKeywordsInPositionDescription(keyword).Count > 0,
             "Searched keyword wasn't found in the search results");
     }
 
     [TestCase("BLOCKCHAIN")]
-    [TestCase("Cloud")]
     [TestCase("Automation")]
+    [TestCase("Cloud")]
     public void ValidateGlobalSearch(string searchQuery)
     {
-        driver.Navigate().GoToUrl(EpamHomePage);
-        driver.FindElement(searchIconLocator).Click();
+        basePage
+            .Open()
+            .PerformSearchByKeyword(searchQuery);
 
-        var searchPanel = wait.Until(driver => driver.FindElement(searchPanelLocator));
-        var searchInput = searchPanel.FindElement(searchInputLocator);
-
-        ClickAndSendKeysActions(searchInput, 2, searchQuery);
-
-        searchPanel.FindElement(searchFindButtonLocator).Click();
-
-        IList<IWebElement> links = wait.Until(driver => driver.FindElements(articlesLocator));
+        IList<IWebElement> links = searchPage.GetAllArticles();
         bool allLinksContainSearchedWord = links.All(link => link.Text.ToLower().Contains(searchQuery.ToLower()));
 
-        Assert.That(links.Count > 0 && allLinksContainSearchedWord,
+        Assert.That(searchPage.GetAllArticles().Count > 0 && allLinksContainSearchedWord,
             "Either there are no links in the search results or not all contain searched programming language");
     }
 
-    [OneTimeTearDown]
-    public static void TearDownDriver()
+    [TestCase(3)]
+    [TestCase(4)]
+    [TestCase(5)]
+    public void CarouselTitleEqualToArticleTitleAtSlide(int slide)
     {
-        driver.Quit();
+        basePage
+            .Open()
+            .AcceptCookies()
+            .NavigateToPage<InsightsPage>("Insights")
+            .NavigateToCarouselPage(slide);
+
+        articlePage = insightsPage.SaveTitleAndNavigateToArticle();
+
+        Assert.That(articlePage.GetArticleTitle().Trim(), Is.EqualTo(articlePage.ArticleName.Trim()));
     }
 
-    public void ClickAndSendKeysActions(IWebElement element, int pauseDurationSeconds, string testParamater)
+    [TestCase("EPAM_Corporate_Overview_Q4_EOY.pdf")]
+    public void DownloadedFileNameIsExpected(string fileName)
     {
-        var clickAndSendKeysActions = new Actions(driver);
+        basePage
+            .Open()
+            .AcceptCookies()
+            .NavigateToPage<AboutPage>("About")
+            .ScrollToEpamAtGlanceSectionAndDownloadOverviewPDF();
 
-        clickAndSendKeysActions
-            .MoveToElement(element)
-            .Click(element)
-            .Pause(TimeSpan.FromSeconds(pauseDurationSeconds))
-            .SendKeys(testParamater)
-            .Pause(TimeSpan.FromSeconds(pauseDurationSeconds))
-            .Perform();
+        bool isDownloaded = basePage.WaitForFileDownloadAndValidate(fileName, 60);
+        Assert.That(isDownloaded);
+    }
+
+    [OneTimeTearDown]
+    public void TearDownDriver()
+    {
+        driver.Quit();
+
+        if (Directory.Exists(downloadDirectory))
+        {
+            Directory.Delete(downloadDirectory, true);
+        }
     }
 }
