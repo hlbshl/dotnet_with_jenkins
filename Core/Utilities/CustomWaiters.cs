@@ -1,10 +1,10 @@
 using OpenQA.Selenium;
 
-namespace PracticalTaskSelenium.Utilities;
+namespace PracticalTaskSelenium.Core.Utilities;
 
 public static class CustomWaiters
 {
-    public static Func<IWebDriver, IWebElement> ElementToBeClickable(By locator)
+    public static Func<IWebDriver, IWebElement> IsElementClickable(By locator)
     {
         return driver =>
         {
@@ -20,7 +20,7 @@ public static class CustomWaiters
         };
     }
 
-    public static Func<IWebDriver, IWebElement> ElementIsVisible(By locator)
+    public static Func<IWebDriver, IWebElement> IsElementVisible(By locator)
     {
         return driver =>
         {
