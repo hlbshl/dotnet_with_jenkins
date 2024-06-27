@@ -4,6 +4,7 @@ using PracticalTaskSelenium.Business.Pages;
 namespace PracticalTaskSelenium.Tests;
 
 [TestFixture]
+[Category("UI")]
 public class EpamTest : BaseTest
 {
     private BasePage _basePage;
