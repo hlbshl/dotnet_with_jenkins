@@ -27,7 +27,8 @@ public class BrowserSettings
         if (headless)
         {
             options.AddArgument("--headless");
-            options.AddArgument("--window-size=1920,1080");
+            options.AddArgument("--width=1920");
+            options.AddArgument("--height=1080");
         }
         options.SetPreference("browser.download.dir", downloadDirectory);
         options.SetPreference("browser.download.folderList", 2);
