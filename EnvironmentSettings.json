@@ -2,6 +2,6 @@
     "TestEnvironment": {
         "BrowserType": "Chrome",
         "Headless": false,
-        "LoggerLevel": "INFO"
+        "LoggerLevel": "ERROR"
     }
 }
